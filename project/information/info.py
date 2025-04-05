@@ -12,7 +12,8 @@ def return_info():
     
     # Get CPU model information
     cpu = cpuinfo.get_cpu_info()
-    cpu_model = cpu.get('brand_raw', 'Unknown CPU Model')  # Using 'brand_raw' as it's more consistent
+    cpu_model = cpu.get('brand_raw', 'Unknown CPU Model')
+
     
     # Return information in a dictionary
     information = {
