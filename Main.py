@@ -4,6 +4,7 @@ import psutil
 import cpuinfo
 import tkinter as tk
 from tkinter.scrolledtext import ScrolledText
+import subprocess
 
 def get_system_info():
     info = []
@@ -117,6 +118,24 @@ def get_gpu_info():
     
     return "\n".join(gpus)
 
+def get_drivers_info():
+    drivers_info = "\n=== Drivers Info ==="
+    if platform.system() == "Windows":
+        try:
+            drivers = subprocess.check_output("driverquery /FO LIST", shell=True).decode()
+            drivers_info += "\n" + drivers
+        except subprocess.CalledProcessError:
+            drivers_info += "\nFailed to fetch drivers information."
+    elif platform.system() == "Linux":
+        try:
+            drivers = subprocess.check_output("lspci -v", shell=True).decode()
+            drivers_info += "\n" + drivers
+        except subprocess.CalledProcessError:
+            drivers_info += "\nFailed to fetch drivers information."
+    else:
+        drivers_info += "\nDrivers info not supported on this platform."
+    return drivers_info
+
 def get_motherboard_info():
     try:
         if platform.system() == "Windows":
@@ -170,13 +189,14 @@ def refresh_info():
         get_memory_info() + "\n" +
         get_disk_info() + "\n" +
         get_gpu_info() + "\n" +
-        get_motherboard_info()
+        get_motherboard_info() + "\n" + 
+        get_drivers_info()
     )
     text_area.insert(tk.END, info)
 
 # Setup GUI
 root = tk.Tk()
-root.title("Hardware Info Monitor")
+root.title("DeepScan")
 root.geometry("1920x1080")
 root.state("zoomed")
 
