@@ -55,27 +55,67 @@ def get_disk_info():
     return "\n".join(disks)
 
 def get_gpu_info():
+    gpus = []
+    gpus.append("\n=== GPU Info ===")
+    
+    # Try GPUtil first
     try:
         import GPUtil
-        gpus = []
-        gpus.append("\n=== GPU Info ===")
-        gpu_list = GPUtil.getGPUs()
-        if not gpu_list:
-            gpus.append("No GPUs detected")
-            return "\n".join(gpus)
-            
-        for i, gpu in enumerate(gpu_list):
-            gpus.append(f"GPU {i+1}: {gpu.name}")
-            gpus.append(f"  Driver: {gpu.driver}")
-            gpus.append(f"  Memory Total: {gpu.memoryTotal} MB")
-            gpus.append(f"  Memory Free: {gpu.memoryFree} MB")
-            gpus.append(f"  Memory Used: {gpu.memoryUsed} MB")
-            gpus.append(f"  Temperature: {gpu.temperature} °C")
-        return "\n".join(gpus)
+        try:
+            gpu_list = GPUtil.getGPUs()
+            if not gpu_list:
+                gpus.append("No GPUs detected by GPUtil")
+            else:
+                for i, gpu in enumerate(gpu_list):
+                    gpus.append(f"GPU {i+1}: {gpu.name}")
+                    gpus.append(f"  Driver: {gpu.driver}")
+                    gpus.append(f"  Memory Total: {gpu.memoryTotal} MB")
+                    gpus.append(f"  Memory Free: {gpu.memoryFree} MB")
+                    gpus.append(f"  Memory Used: {gpu.memoryUsed} MB")
+                    gpus.append(f"  Temperature: {gpu.temperature} °C")
+                return "\n".join(gpus)
+        except Exception as e:
+            gpus.append(f"GPUtil error: {str(e)}")
     except ImportError:
-        return "\n=== GPU Info ===\nGPUtil library not installed. Install with 'pip install gputil'"
-    except Exception as e:
-        return f"\n=== GPU Info ===\nError getting GPU info: {str(e)}"
+        gpus.append("GPUtil not installed (pip install gputil)")
+    
+    # Try alternative methods if GPUtil fails
+    if platform.system() == "Windows":
+        try:
+            import wmi
+            w = wmi.WMI()
+            for gpu in w.Win32_VideoController():
+                gpus.append(f"GPU: {gpu.Name}")
+                if hasattr(gpu, 'AdapterRAM'):
+                    ram_gb = int(gpu.AdapterRAM) / (1024 ** 3)
+                    gpus.append(f"  Memory: {ram_gb:.2f} GB")
+                if hasattr(gpu, 'DriverVersion'):
+                    gpus.append(f"  Driver Version: {gpu.DriverVersion}")
+            return "\n".join(gpus)
+        except Exception as e:
+            gpus.append(f"WMI error: {str(e)}")
+    elif platform.system() == "Linux":
+        try:
+            # Try to get GPU info from lspci if available
+            if os.path.exists('/usr/bin/lspci'):
+                lspci_output = os.popen('lspci -nn | grep -i vga').read()
+                if lspci_output:
+                    gpus.append("GPUs detected:")
+                    for line in lspci_output.split('\n'):
+                        if line.strip():
+                            gpus.append(f"  {line.strip()}")
+                else:
+                    gpus.append("No GPUs detected by lspci")
+            else:
+                gpus.append("lspci not available")
+            return "\n".join(gpus)
+        except Exception as e:
+            gpus.append(f"Linux GPU detection error: {str(e)}")
+    
+    if len(gpus) <= 1:  # Only has the header
+        gpus.append("Could not detect GPU information")
+    
+    return "\n".join(gpus)
 
 def get_motherboard_info():
     try:
@@ -91,7 +131,6 @@ def get_motherboard_info():
                 mobo_info.append(f"Serial Number: {board.SerialNumber}")
                 mobo_info.append(f"Version: {board.Version}")
             
-
             for bios in w.Win32_BIOS():
                 mobo_info.append(f"BIOS Vendor: {bios.Manufacturer}")
                 mobo_info.append(f"BIOS Version: {bios.Version}")
@@ -135,15 +174,19 @@ def refresh_info():
     )
     text_area.insert(tk.END, info)
 
+# Setup GUI
 root = tk.Tk()
 root.title("Hardware Info Monitor")
-root.geometry("1260x720")
+root.geometry("1920x1080")
+root.state("zoomed")
 
 text_area = ScrolledText(root, font=("Consolas", 10))
 text_area.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
 refresh_button = tk.Button(root, text="Refresh", command=refresh_info)
 refresh_button.pack(pady=5)
+
+# Load info on startup
 refresh_info()
 
 root.mainloop()
